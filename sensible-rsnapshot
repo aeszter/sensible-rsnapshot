@@ -1,0 +1,37 @@
+#!/bin/bash
+
+TARGET=/backup/snapshots
+LOG=/backup/log
+
+[ -d $TARGET ] || exit 2
+
+function invoke() {
+  SERIES=$1
+  PERIOD=$2
+  PRED=$3
+  echo trying $1 ... >>$LOG
+  if [ -e $TARGET/$PRED ]; then
+    if [ -e $TARGET/$SERIES.0 ]; then
+      MTIME=`stat -c %Y $TARGET/$SERIES.0`
+      PTIME=`stat -c %Y $TARGET/$PRED`
+      if [ $((PTIME-MTIME)) -gt $PERIOD ]; then
+        echo moving $PRED to $SERIES.0 >>$LOG
+        rsnapshot $1
+      else
+        echo $PRED too close to $SERIES >>$LOG
+        echo $PTIME .. $MTIME leq $PERIOD >>$LOG
+      fi
+    else
+      echo moving $PRED to $SERIES.0 >>$LOG
+      rsnapshot $1
+    fi
+  else
+    echo $PRED does not exist >>$LOG
+  fi
+}
+
+date >>$LOG
+invoke monthly $((30*24*3600)) weekly.3
+invoke weekly $((7*24*3600)) daily.6
+invoke daily $((24*3600)) hourly.23
+rsnapshot hourly
